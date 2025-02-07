@@ -1,0 +1,32 @@
+# Virtual environment
+env/
+.env
+*.env
+
+# Python bytecode and compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Flask and temporary files
+instance/
+*.log
+*.sqlite3
+*.db
+
+# Jupyter Notebooks checkpoints (if using)
+.ipynb_checkpoints/
+
+# Operating system-specific files
+.DS_Store
+Thumbs.db
+
+# IDE and editor config files
+.vscode/
+.idea/
+*.swp
+
+# Uploaded files
+data/
+uploads/
