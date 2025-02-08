@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ETLFlow - Upload & Query Data</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-6">
+    
+    <div class="w-full max-w-6xl bg-white p-6 rounded-lg shadow-lg grid grid-cols-2 gap-6">
+        <!-- Left Side: File Upload and Uploaded Data -->
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800 mb-4">Upload CSV File</h1>
+            
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div id="flash-message" class="p-3 mb-4 text-white text-center rounded-lg {% if category == 'success' %}bg-green-500{% else %}bg-red-500{% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                    <script>
+                        setTimeout(() => {
+                            document.getElementById("flash-message").style.display = "none";
+                        }, 3000);
+                    </script>
+                {% endif %}
+            {% endwith %}
+
+            <!-- File Upload Form -->
+            <form action="/" method="POST" enctype="multipart/form-data" class="space-y-4">
+                <input type="file" name="file" class="block w-full p-2 border border-gray-300 rounded-lg">
+                <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
+                    Upload File
+                </button>
+            </form>
+
+            <!-- Table of Uploaded Data -->
+            {% if records %}
+            <div class="mt-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">Uploaded Data</h2>
+                <div class="overflow-x-auto max-h-60 overflow-y-auto">
+                    <table class="min-w-full bg-white border border-gray-200">
+                        <thead>
+                            <tr class="bg-gray-200">
+                                {% for column in records[0].keys() %}
+                                    <th class="py-2 px-4 border">{{ column }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in records %}
+                                <tr class="border">
+                                    {% for value in row.values() %}
+                                        <td class="py-2 px-4 border">{{ value }}</td>
+                                    {% endfor %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="flex justify-center space-x-4 mt-4">
+                    <a href="{{ url_for('export_csv') }}" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded">
+                        Export to CSV
+                    </a>
+                    <a href="{{ url_for('export_parquet') }}" class="bg-purple-500 hover:bg-purple-600 text-white py-2 px-4 rounded">
+                        Export to Parquet
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Right Side: Query Database -->
+        <div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Query the Database</h2>
+            <form id="query-form" class="space-y-4">
+                <textarea id="query" name="query" rows="4" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="Enter SQL query..."></textarea>
+                <button type="button" id="run-query" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
+                    Run Query
+                </button>
+            </form>
+
+            <!-- Query Results Table -->
+            <div id="query-results" class="mt-6"></div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById("run-query").addEventListener("click", async () => {
+            const query = document.getElementById("query").value;
+            if (!query) {
+                alert("Please enter a query.");
+                return;
+            }
+            
+            const response = await fetch("/query", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ query })
+            });
+            
+            const data = await response.json();
+            const resultsDiv = document.getElementById("query-results");
+            
+            if (data.error) {
+                resultsDiv.innerHTML = `<p class='text-red-500'>Error: ${data.error}</p>`;
+                return;
+            }
+            
+            if (data.length === 0) {
+                resultsDiv.innerHTML = `<p class='text-gray-600'>No results found.</p>`;
+                return;
+            }
+            
+            let table = `<table class='min-w-full bg-white border border-gray-200 mt-4'><thead><tr class='bg-gray-200'>`;
+            Object.keys(data[0]).forEach(col => {
+                table += `<th class='py-2 px-4 border'>${col}</th>`;
+            });
+            table += `</tr></thead><tbody>`;
+            
+            data.forEach(row => {
+                table += `<tr class='border'>`;
+                Object.values(row).forEach(val => {
+                    table += `<td class='py-2 px-4 border'>${val}</td>`;
+                });
+                table += `</tr>`;
+            });
+            table += `</tbody></table>`;
+            
+            resultsDiv.innerHTML = table;
+        });
+    </script>
+</body>
+</html>
