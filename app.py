@@ -140,6 +140,7 @@ def upload_file():
 
     return render_template("index.html", records=records)
 
+
 @app.route("/api/data")
 def get_data():
     try:
@@ -173,6 +174,53 @@ def query_database():
     except SQLAlchemyError as e:
         return jsonify({"error": str(e)}), 500
     
+@app.route("/db-info", methods=["GET"])
+def get_db_info():
+    try:
+        with db.engine.connect() as conn:
+            # Define your database and table name
+            db_name = "etlflow_db"  
+            table_name = "etl_data"
+
+            # Check if the table exists
+            query = text("SHOW TABLES LIKE :table_name")
+            result = conn.execute(query, {"table_name": table_name}).fetchall()
+            table_names = [row[0] for row in result] if result else []
+
+        return jsonify({"database": db_name, "tables": table_names})
+    except SQLAlchemyError as e:
+        return jsonify({"error": str(e)}), 500
+    
+@app.route("/data_summary", methods=["GET"])
+def data_summary():
+    try:
+        with db.engine.connect() as conn:
+            result = conn.execute(text("SELECT * FROM etl_data"))
+            df = pd.DataFrame(result.fetchall(), columns=result.keys())
+
+        if df.empty:
+            return jsonify({"error": "No data available"}), 400
+
+        # Summary statistics
+        summary = df.describe(include="all").to_dict()
+
+        # Missing values
+        missing_values = df.isnull().sum().to_dict()
+
+        # Unique values count
+        unique_counts = df.nunique().to_dict()
+
+        return jsonify({
+            "summary": summary,
+            "missing_values": missing_values,
+            "unique_counts": unique_counts
+        })
+    
+    except SQLAlchemyError as e:
+        logging.error(f"Error generating summary: {e}")
+        return jsonify({"error": "Error generating summary"}), 500
+
+    
 @app.route("/export/csv")
 def export_csv():
     df = pd.read_sql("SELECT * FROM etl_data", db.engine)
@@ -187,7 +235,18 @@ def export_parquet():
     df.to_parquet(parquet_path, engine="pyarrow", index=False)
     return send_file(parquet_path, as_attachment=True)
 
+def clear_table():
+    try:
+        with db.engine.connect() as conn:
+            conn.execute(text("DELETE FROM etl_data"))
+            conn.commit() 
+        print("Table cleared on startup")
+    except SQLAlchemyError as e:
+        print(f"Error clearing table: {e}")
+
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+        clear_table()
     app.run(debug=True)
